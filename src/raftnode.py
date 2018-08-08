@@ -2,7 +2,7 @@ from gevent.socket import SocketType
 
 import time
 
-class RaftNode(SocketType):
+class RaftNode(object):
 
     def __init__(self, election_timeout):
         self.sock = SocketType()
@@ -14,5 +14,5 @@ class RaftNode(SocketType):
         self.sock.connect((ip, port))
 
 if __name__ == "__main__":
-    st = SocketType()
-    st.connect(("127.0.0.1", 16981))
+    st = RaftNode(10)
+    st.connect("127.0.0.1", 16981)

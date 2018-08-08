@@ -2,18 +2,22 @@ from gevent.server import StreamServer
 import sys
 
 """
-The Overseer protocol is a space-delimited (byte 32) protocol which follows the
-following guidelines:
+The Overseer protocol is a space-delimited (byte 20) protocol which follows the
+following guidelines. This is the RPC router/mechanism between raftel nodes:
 
 - All transmissions are wrapped around STX (2) and ETX (3) bytes. Immediately
-after the STX, is the packet number which is a eight bits (so wrap around 256).
-- Commands (between STX and ETX) follow the format <command><space><args...>
-where arguments are also space delimited. arguments are prohibited from having
-spaces in them.
+after the STX, is the packet number which is eight bits (so wrap around 256).
+After that is the command.
+
+- Commands (between STX and ETX) follow the format <command><RS><args...>
+where arguments are also RS delimited. (NOTE: RS is the record separator
+character, byte 1E.)
 
 # Reserved instructions for Overseer.
 
-- Every command will be ACKed (6) or NACKed (21), depending on whether the
+- Responses will take the form <ACK OR NACK><RS><ADDITIONAL INFO>.
+
+- Every command will be ACKed (6) or NACKed (15), depending on whether the
 transaction is successful or not. NACKs will give the following reasons:
     
     Z - General failure
@@ -22,7 +26,7 @@ transaction is successful or not. NACKs will give the following reasons:
 
 Responses will also start with the packet number they are acknowledging.
 - When a client connects to the Overseer, it connects with a log-in command (A).
-- Graceful termination would happen by sendind a log-out command (B).
+- Graceful termination would happen by sending a log-out command (B).
 """
 
 class OverSeerver(StreamServer):
