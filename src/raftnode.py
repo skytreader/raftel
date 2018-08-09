@@ -1,3 +1,4 @@
+from commons import RPCPacket
 from gevent.socket import SocketType
 
 import commons
@@ -30,11 +31,9 @@ class RaftNode(object):
 
     def connect(self, ip, port):
         self.sock.connect((ip, port))
-        login = bytes([
-            commons.STX, 0, commons.RS, ord("A"), commons.ETX
-        ])
+        login = RPCPacket(0, ord("A"))
         logger.info("SEND: %s" % login)
-        self.sock.sendall(login)
+        self.sock.sendall(login.make_sendable_stream())
         spam = self.sock.recvfrom(128)
         
         logger.info("RECV: %s" % spam[0])

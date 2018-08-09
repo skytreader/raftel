@@ -61,10 +61,8 @@ class OverSeerver(StreamServer):
         parsed_packet = RPCPacket.parse(packet, logger_name=LOGGER_NAME)
         logger.debug("The command is %s vs %s" % (parsed_packet.command, ord('A')))
         if parsed_packet.command == b'A':
-            return bytes([
-                commons.STX, int.from_bytes(parsed_packet.packet_number, sys.byteorder),
-                commons.RS, commons.ACK, commons.ETX
-            ])
+            login_ack = RPCPacket(int.from_bytes(parsed_packet.packet_number, sys.byteorder), commons.ACK)
+            return login_ack.make_sendable_stream()
 
     def handle(self, client_socket, address):
         logger.info("connection RECV %s" % client_socket)
