@@ -1,7 +1,24 @@
 from gevent.socket import SocketType
 
 import commons
+import logging
+import os
 import time
+
+LOGGER_NAME = "raftel-node"
+logger = logging.getLogger(LOGGER_NAME)
+logger.setLevel(os.environ.get("raftel-log-level", logging.INFO))
+
+formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+
+file_handler = logging.FileHandler("raftel-node.log")
+file_handler.setFormatter(formatter)
+
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(formatter)
+
+logger.addHandler(file_handler)
+logger.addHandler(stream_handler)
 
 class RaftNode(object):
 
@@ -16,10 +33,11 @@ class RaftNode(object):
         login = bytes([
             commons.STX, 0, commons.RS, ord("A"), commons.ETX
         ])
+        logger.info("SEND: %s" % login)
         self.sock.sendall(login)
         spam = self.sock.recvfrom(128)
         
-        print(spam)
+        logger.info("RECV: %s" % spam[0])
 
 if __name__ == "__main__":
     st = RaftNode(10)

@@ -1,5 +1,9 @@
 from gevent.server import StreamServer
+from commons import RPCPacket
+
 import commons
+import logging
+import os
 import sys
 
 """
@@ -31,38 +35,20 @@ Responses will also start with the packet number they are acknowledging.
 - Graceful termination would happen by sending a log-out command (B).
 """
 
-class RPCPacket(object):
+LOGGER_NAME = "raftel-overseer"
+logger = logging.getLogger(LOGGER_NAME)
+logger.setLevel(os.environ.get("raftel-log-level", logging.INFO))
 
-    def __init__(self, packet_number=None, command=None, additional_info=None):
-        self.packet_number = packet_number
-        self.command = command
-        self.additional_info = additional_info
+formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 
-    @staticmethod
-    def parse(packet_stream):
-        byte_acc = []
+file_handler = logging.FileHandler("raftel-overseer.log")
+file_handler.setFormatter(formatter)
 
-        packet_order = ("packet_number", "command", "additional_info")
-        packet_kwargs = {}
-        field_index = 0
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(formatter)
 
-        # Automagically ignore STX and ETX
-        i = 1
-        limit = len(packet_stream) - 1
-
-        while i < limit:
-            print("inspecting: %s" % packet_stream[i])
-            if packet_stream[i] == commons.RS and field_index < 2:
-                packet_kwargs[packet_order[field_index]] = bytes(byte_acc)
-                byte_acc = []
-                field_index += 1
-            else:
-                byte_acc.append(packet_stream[i])
-            i += 1
-
-        packet_kwargs[packet_order[field_index]] = bytes(byte_acc)
-        parsed_packet = RPCPacket(**packet_kwargs)
-        return parsed_packet
+logger.addHandler(file_handler)
+logger.addHandler(stream_handler)
 
 class OverSeerver(StreamServer):
 
@@ -72,8 +58,8 @@ class OverSeerver(StreamServer):
         self.socket_clique = []
 
     def __interpret_command(self, packet):
-        parsed_packet = RPCPacket.parse(packet)
-        print("The command is %s vs %s" % (parsed_packet.command, ord('A')))
+        parsed_packet = RPCPacket.parse(packet, logger_name=LOGGER_NAME)
+        logger.debug("The command is %s vs %s" % (parsed_packet.command, ord('A')))
         if parsed_packet.command == b'A':
             return bytes([
                 commons.STX, int.from_bytes(parsed_packet.packet_number, sys.byteorder),
@@ -81,15 +67,17 @@ class OverSeerver(StreamServer):
             ])
 
     def handle(self, client_socket, address):
-        print("someone connected %s" % client_socket)
+        logger.info("connection RECV %s" % client_socket)
         packet_acc = []
 
         while commons.ETX not in packet_acc:
             p = client_socket.recvfrom(32)
-            print(p)
+            logger.debug(p)
             packet_acc.extend(p[0])
         
+        logger.info("RECV %s" % packet_acc)
         resp = self.__interpret_command(packet_acc)
+        logger.info("SEND %s" % resp)
         client_socket.sendall(resp)
 
 if __name__ == "__main__":
