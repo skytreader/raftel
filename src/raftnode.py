@@ -1,5 +1,6 @@
 from gevent.socket import SocketType
 
+import commons
 import time
 
 class RaftNode(object):
@@ -12,6 +13,13 @@ class RaftNode(object):
 
     def connect(self, ip, port):
         self.sock.connect((ip, port))
+        login = bytes([
+            commons.STX, 0, commons.RS, ord("A"), commons.ETX
+        ])
+        self.sock.sendall(login)
+        spam = self.sock.recvfrom(128)
+        
+        print(spam)
 
 if __name__ == "__main__":
     st = RaftNode(10)
