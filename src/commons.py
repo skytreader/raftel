@@ -11,7 +11,7 @@ class RPCPacket(object):
 
     # Specifically tailored for **dictionary usage. Please don't leave them be
     # except possible additional_info.
-    def __init__(self, packet_number=None, command=None, additional_info=None):
+    def __init__(self, packet_number: int =None, command=None, additional_info=None) -> None:
         self.packet_number = packet_number
         self.command = command
         self.additional_info = additional_info if additional_info else []
