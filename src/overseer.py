@@ -57,14 +57,14 @@ class OverSeerver(StreamServer):
         self.leader = None
         self.socket_clique = []
 
-    def __interpret_command(self, packet):
+    def __interpret_command(self, packet) -> RPCPacket:
         parsed_packet = RPCPacket.parse(packet, logger_name=LOGGER_NAME)
         logger.info("RECV %s" % parsed_packet)
         logger.debug("The command is %s vs %s" % (parsed_packet.command, ord('A')))
         if parsed_packet.command == ord('A'):
             logger.debug("Calling RPCPacket for ACK")
             login_ack = RPCPacket(parsed_packet.packet_number, commons.ACK)
-            return login_ack.make_sendable_stream()
+            return login_ack
 
     def handle(self, client_socket, address):
         logger.info("connection RECV %s" % client_socket)
@@ -76,8 +76,10 @@ class OverSeerver(StreamServer):
             packet_acc.extend(p[0])
         
         resp = self.__interpret_command(packet_acc)
+        if resp.command == commons.ACK:
+            self.socket_clique.append(client_socket)
         logger.info("SEND %s" % resp)
-        client_socket.sendall(resp)
+        client_socket.sendall(resp.make_sendable_stream())
 
 if __name__ == "__main__":
     overseer = OverSeerver(int(sys.argv[1]))

@@ -2,7 +2,7 @@
 
 An exercise in implementing [Raft](https://raft.github.io/).
 
-## running
+## Running
 
 Create a virtualenv, install the requirements and then in separate tabs issue:
 
@@ -12,3 +12,13 @@ Create a virtualenv, install the requirements and then in separate tabs issue:
 ```
 
 Of course, the port number can be changed.
+
+## Type Checking
+
+This makes use of [mypy](http://mypy-lang.org) to add type annotations to the
+code. To check that your modifications are type-consistent:
+
+    mypy --ignore-missing-imports src/*.py
+
+We ignore missing imports because gevent does not have mypy types as of this
+writing.
