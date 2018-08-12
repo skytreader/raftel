@@ -37,7 +37,7 @@ Responses will also start with the packet number they are acknowledging.
 
 LOGGER_NAME = "raftel-overseer"
 logger = logging.getLogger(LOGGER_NAME)
-logger.setLevel(os.environ.get("raftel-log-level", logging.INFO))
+logger.setLevel(int(os.environ.get("raftel_log_level", logging.INFO)))
 
 formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 
@@ -59,9 +59,11 @@ class OverSeerver(StreamServer):
 
     def __interpret_command(self, packet):
         parsed_packet = RPCPacket.parse(packet, logger_name=LOGGER_NAME)
+        logger.info("RECV %s" % parsed_packet)
         logger.debug("The command is %s vs %s" % (parsed_packet.command, ord('A')))
-        if parsed_packet.command == b'A':
-            login_ack = RPCPacket(int.from_bytes(parsed_packet.packet_number, sys.byteorder), commons.ACK)
+        if parsed_packet.command == ord('A'):
+            logger.debug("Calling RPCPacket for ACK")
+            login_ack = RPCPacket(parsed_packet.packet_number, commons.ACK)
             return login_ack.make_sendable_stream()
 
     def handle(self, client_socket, address):
@@ -73,7 +75,6 @@ class OverSeerver(StreamServer):
             logger.debug(p)
             packet_acc.extend(p[0])
         
-        logger.info("RECV %s" % packet_acc)
         resp = self.__interpret_command(packet_acc)
         logger.info("SEND %s" % resp)
         client_socket.sendall(resp)

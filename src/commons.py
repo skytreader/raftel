@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 
 STX = 2
 ETX = 3
@@ -11,10 +12,27 @@ class RPCPacket(object):
 
     # Specifically tailored for **dictionary usage. Please don't leave them be
     # except possible additional_info.
-    def __init__(self, packet_number: int =None, command=None, additional_info=None) -> None:
+    def __init__(
+        self, packet_number: int =None, command: int =None, additional_info=None,
+        logger_name="raftel-commons"
+    ) -> None:
         self.packet_number = packet_number
         self.command = command
         self.additional_info = additional_info if additional_info else []
+
+        self.logger = logging.getLogger(logger_name)
+        # Always
+        self.logger.setLevel(logging.DEBUG)
+
+        formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+        stream_handler = logging.StreamHandler()
+        stream_handler.setFormatter(formatter)
+
+        self.logger.addHandler(stream_handler)
+
+        self.logger.debug("RPCPacket debug: %s %s" % (self.packet_number, type(self.packet_number)))
+        self.logger.debug("RPCPacket debug: %s %s" % (self.command, type(self.command)))
+        self.logger.debug("RPCPacket debug: %s %s" % (self.additional_info, type(self.additional_info)))
 
     @staticmethod
     def parse(packet_stream, logger_name="raftel-common"):
@@ -22,7 +40,7 @@ class RPCPacket(object):
         byte_acc = []
 
         packet_order = ("packet_number", "command", "additional_info")
-        packet_kwargs = {}
+        packet_kwargs = {"logger_name": logger_name}
         field_index = 0
 
         # Automagically ignore STX and ETX
@@ -32,14 +50,15 @@ class RPCPacket(object):
         while i < limit:
             logger.debug("inspecting: %s" % packet_stream[i])
             if packet_stream[i] == RS and field_index < 2:
-                packet_kwargs[packet_order[field_index]] = bytes(byte_acc)
+                packet_kwargs[packet_order[field_index]] = int.from_bytes(bytes(byte_acc), sys.byteorder)
                 byte_acc = []
                 field_index += 1
             else:
                 byte_acc.append(packet_stream[i])
             i += 1
 
-        packet_kwargs[packet_order[field_index]] = bytes(byte_acc)
+        packet_kwargs[packet_order[field_index]] = int.from_bytes(bytes(byte_acc), sys.byteorder)
+        logger.info("Calling RPCPacket for parsed stream")
         parsed_packet = RPCPacket(**packet_kwargs)
         return parsed_packet
 

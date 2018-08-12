@@ -9,7 +9,7 @@ import time
 
 LOGGER_NAME = "raftel-node"
 logger = logging.getLogger(LOGGER_NAME)
-logger.setLevel(os.environ.get("raftel-log-level", logging.INFO))
+logger.setLevel(int(os.environ.get("raftel_log_level", logging.INFO)))
 
 formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 
