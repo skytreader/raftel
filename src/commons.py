@@ -21,8 +21,6 @@ class RPCPacket(object):
         self.additional_info = additional_info if additional_info else []
 
         self.logger = logging.getLogger(logger_name)
-        # Always
-        self.logger.setLevel(logging.DEBUG)
 
         formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
         stream_handler = logging.StreamHandler()
