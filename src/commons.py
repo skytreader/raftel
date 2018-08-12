@@ -22,11 +22,12 @@ class RPCPacket(object):
 
         self.logger = logging.getLogger(logger_name)
 
-        formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-        stream_handler = logging.StreamHandler()
-        stream_handler.setFormatter(formatter)
+        if logger_name == "raftel-commons":
+            formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+            stream_handler = logging.StreamHandler()
+            stream_handler.setFormatter(formatter)
 
-        self.logger.addHandler(stream_handler)
+            self.logger.addHandler(stream_handler)
 
         self.logger.debug("RPCPacket debug: %s %s" % (self.packet_number, type(self.packet_number)))
         self.logger.debug("RPCPacket debug: %s %s" % (self.command, type(self.command)))
