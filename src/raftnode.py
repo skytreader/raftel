@@ -24,13 +24,13 @@ logger.addHandler(stream_handler)
 
 class RaftNode(object):
 
-    def __init__(self, election_timeout):
+    def __init__(self, election_timeout: int) -> None:
         self.sock = SocketType()
         # "Mock" leader ping to start with.
         self.last_leader_ping = int(time.time() * 1000)
         self.election_timeout = election_timeout
 
-    def connect(self, ip, port):
+    def connect(self, ip: str, port: int) -> None:
         self.sock.connect((ip, port))
         login = RPCPacket(0, ord("A"))
         logger.info("SEND: %s" % login)

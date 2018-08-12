@@ -1,23 +1,25 @@
+from typing import List
+
 import logging
 import os
 import sys
 
-STX = 2
-ETX = 3
-ACK = int("6", 16)
-NACK = int("15", 16)
-RS = int("1E", 16)
+STX = 2 # type: int
+ETX = 3 # type: int
+ACK = int("6", 16) # type: int
+NACK = int("15", 16) # type: int
+RS = int("1E", 16) # type: int
 
 class RPCPacket(object):
 
     # Specifically tailored for **dictionary usage. Please don't leave them be
     # except possible additional_info.
     def __init__(
-        self, packet_number: int =None, command: int =None, additional_info=None,
+        self, packet_number: int =-1, command: int =-1, additional_info=None,
         logger_name="raftel-commons"
     ) -> None:
-        self.packet_number = packet_number
-        self.command = command
+        self.packet_number = packet_number # type: int
+        self.command = command # type: int
         self.additional_info = additional_info if additional_info else []
 
         self.logger = logging.getLogger(logger_name)
@@ -34,9 +36,9 @@ class RPCPacket(object):
         self.logger.debug("RPCPacket debug: %s %s" % (self.additional_info, type(self.additional_info)))
 
     @staticmethod
-    def parse(packet_stream, logger_name="raftel-common"):
+    def parse(packet_stream, logger_name="raftel-common") -> RPCPacket:
         logger = logging.getLogger(logger_name)
-        byte_acc = []
+        byte_acc = [] # type: list
 
         packet_order = ("packet_number", "command", "additional_info")
         packet_kwargs = {"logger_name": logger_name}
@@ -61,11 +63,11 @@ class RPCPacket(object):
         parsed_packet = RPCPacket(**packet_kwargs)
         return parsed_packet
 
-    def make_sendable_stream(self):
+    def make_sendable_stream(self) -> bytes:
         addtl_info_encoded = [ord(c) for c in self.additional_info]
         partial_packet = [
             STX, self.packet_number, RS, self.command
-        ]
+        ] # type: List[int]
 
         if addtl_info_encoded:
             partial_packet.append(RS)

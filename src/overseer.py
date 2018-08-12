@@ -52,10 +52,10 @@ logger.addHandler(stream_handler)
 
 class OverSeerver(StreamServer):
 
-    def __init__(self, bind_port, **kwargs):
+    def __init__(self, bind_port: int, **kwargs) -> None:
         super(OverSeerver, self).__init__(("127.0.0.1", bind_port))
         self.leader = None
-        self.socket_clique = []
+        self.socket_clique = [] # type: list
 
     def __interpret_command(self, packet) -> RPCPacket:
         parsed_packet = RPCPacket.parse(packet, logger_name=LOGGER_NAME)
