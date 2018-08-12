@@ -80,4 +80,5 @@ class OverSeerver(StreamServer):
 
 if __name__ == "__main__":
     overseer = OverSeerver(int(sys.argv[1]))
+    logger.info("Starting overseer...")
     overseer.serve_forever()

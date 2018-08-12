@@ -4,6 +4,7 @@ from gevent.socket import SocketType
 import commons
 import logging
 import os
+import sys
 import time
 
 LOGGER_NAME = "raftel-node"
@@ -40,4 +41,4 @@ class RaftNode(object):
 
 if __name__ == "__main__":
     st = RaftNode(10)
-    st.connect("127.0.0.1", 16981)
+    st.connect("127.0.0.1", int(sys.argv[1]))
