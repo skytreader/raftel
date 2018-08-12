@@ -9,3 +9,4 @@
 *.bak
 dist/
 build/
+*.mypy_cache/*
