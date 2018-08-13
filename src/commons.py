@@ -36,7 +36,7 @@ class RPCPacket(object):
         self.logger.debug("RPCPacket debug: %s %s" % (self.additional_info, type(self.additional_info)))
 
     @staticmethod
-    def parse(packet_stream, logger_name="raftel-common") -> RPCPacket:
+    def parse(packet_stream, logger_name="raftel-common") -> "RPCPacket":
         logger = logging.getLogger(logger_name)
         byte_acc = [] # type: list
 
