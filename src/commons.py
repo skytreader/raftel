@@ -35,8 +35,15 @@ class RPCPacket(object):
         self.logger.debug("RPCPacket debug: %s %s" % (self.command, type(self.command)))
         self.logger.debug("RPCPacket debug: %s %s" % (self.additional_info, type(self.additional_info)))
 
+    def validate(self) -> bool:
+        return 0 <= self.packet_number <= 256
+
     @staticmethod
-    def parse(packet_stream, logger_name="raftel-common") -> "RPCPacket":
+    def validate_stream(packet_stream: List[int]) -> bool:
+        return RPCPacket.parse(packet_stream).validate()
+
+    @staticmethod
+    def parse(packet_stream: List[int], logger_name="raftel-common") -> "RPCPacket":
         logger = logging.getLogger(logger_name)
         byte_acc = [] # type: list
 
@@ -59,7 +66,7 @@ class RPCPacket(object):
             i += 1
 
         packet_kwargs[packet_order[field_index]] = int.from_bytes(bytes(byte_acc), sys.byteorder)
-        logger.info("Calling RPCPacket for parsed stream")
+        logger.debug("Calling RPCPacket for parsed stream")
         parsed_packet = RPCPacket(**packet_kwargs)
         return parsed_packet
 

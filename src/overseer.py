@@ -1,5 +1,6 @@
 from gevent.server import StreamServer
 from commons import RPCPacket
+from typing import List
 
 import commons
 import logging
@@ -31,8 +32,13 @@ transaction is successful or not. NACKs will give the following reasons:
     X - Invalid/unknown command.
 
 Responses will also start with the packet number they are acknowledging.
+
 - When a client connects to the Overseer, it connects with a log-in command (A).
+
 - Graceful termination would happen by sending a log-out command (B).
+
+- During idle times, each node should send a keep alive (C) to the Overseer.
+This is distinct from the leader heartbeat specified in the Raft protocol.
 """
 
 LOGGER_NAME = "raftel-overseer"
@@ -57,26 +63,26 @@ class OverSeerver(StreamServer):
         self.leader = None
         self.socket_clique = [] # type: list
 
-    def __interpret_command(self, packet) -> RPCPacket:
-        parsed_packet = RPCPacket.parse(packet, logger_name=LOGGER_NAME)
-        logger.info("RECV %s" % parsed_packet)
+    def __make_response(self, parsed_packet: RPCPacket) -> RPCPacket:
         logger.debug("The command is %s vs %s" % (parsed_packet.command, ord('A')))
-        if parsed_packet.command == ord('A'):
+        if parsed_packet.validate():
             logger.debug("Calling RPCPacket for ACK")
-            login_ack = RPCPacket(parsed_packet.packet_number, commons.ACK)
-            return login_ack
+            ack = RPCPacket(parsed_packet.packet_number, commons.ACK)
+            return ack
 
     def handle(self, client_socket, address):
         logger.info("connection RECV %s" % client_socket)
-        packet_acc = []
+        packet_acc = [] # type: List[int]
 
         while commons.ETX not in packet_acc:
             p = client_socket.recvfrom(32)
             logger.debug(p)
             packet_acc.extend(p[0])
         
-        resp = self.__interpret_command(packet_acc)
-        if resp.command == commons.ACK:
+        parsed_packet = RPCPacket.parse(packet_acc)
+        logger.info("RECV %s" % parsed_packet)
+        resp = self.__make_response(parsed_packet)
+        if parsed_packet.command == ord("A") and resp.command == commons.ACK:
             self.socket_clique.append(client_socket)
         logger.info("SEND %s" % resp)
         client_socket.sendall(resp.make_sendable_stream())
