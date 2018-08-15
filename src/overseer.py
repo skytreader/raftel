@@ -1,8 +1,10 @@
+from gevent import Greenlet
 from gevent.server import StreamServer
 from commons import RPCPacket
 from typing import List
 
 import commons
+import gevent
 import logging
 import os
 import sys
@@ -56,6 +58,38 @@ stream_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 logger.addHandler(stream_handler)
 
+class ClientHandler(Greenlet):
+
+    def __init__(self, client_socket):
+        Greenlet.__init__(self)
+        self.client_socket = client_socket
+
+    def __make_response(self, parsed_packet: RPCPacket) -> RPCPacket:
+        logger.debug("The command is %s vs %s" % (parsed_packet.command, ord('A')))
+        if parsed_packet.validate():
+            logger.debug("Calling RPCPacket for ACK")
+            ack = RPCPacket(parsed_packet.packet_number, commons.ACK)
+            return ack
+
+    def __read_from_client(self, client_socket, packet_acc=None) -> List[int]:
+        packet_acc = packet_acc if packet_acc else [] # type: List[int]
+
+        while commons.ETX not in packet_acc:
+            p = client_socket.recvfrom(32)
+            logger.debug(p)
+            packet_acc.extend(p[0])
+
+        return packet_acc
+
+    def _run(self):
+        while True:
+            recv = RPCPacket.parse(self.__read_from_client(self.client_socket))
+            logger.info("RECV %s" % recv)
+            resp = self.__make_response(recv)
+            logger.info("SEND %s" % resp)
+            self.client_socket.sendall(resp.make_sendable_stream())
+            gevent.sleep(1)
+
 class OverSeerver(StreamServer):
 
     def __init__(self, bind_port: int, **kwargs) -> None:
@@ -70,14 +104,19 @@ class OverSeerver(StreamServer):
             ack = RPCPacket(parsed_packet.packet_number, commons.ACK)
             return ack
 
-    def handle(self, client_socket, address):
-        logger.info("connection RECV %s" % client_socket)
-        packet_acc = [] # type: List[int]
+    def __read_from_client(self, client_socket, packet_acc=None) -> List[int]:
+        packet_acc = packet_acc if packet_acc else [] # type: List[int]
 
         while commons.ETX not in packet_acc:
             p = client_socket.recvfrom(32)
             logger.debug(p)
             packet_acc.extend(p[0])
+
+        return packet_acc
+
+    def handle(self, client_socket, address):
+        logger.info("connection RECV %s" % client_socket)
+        packet_acc = self.__read_from_client(client_socket) # type: List[int]
         
         parsed_packet = RPCPacket.parse(packet_acc)
         logger.info("RECV %s" % parsed_packet)
@@ -85,7 +124,11 @@ class OverSeerver(StreamServer):
         if parsed_packet.command == ord("A") and resp.command == commons.ACK:
             self.socket_clique.append(client_socket)
         logger.info("SEND %s" % resp)
+        logger.info("Spawning greenlet for %s" % client_socket)
         client_socket.sendall(resp.make_sendable_stream())
+        ch = ClientHandler(client_socket)
+        ch.start()
+        ch.join()
 
 if __name__ == "__main__":
     overseer = OverSeerver(int(sys.argv[1]))
