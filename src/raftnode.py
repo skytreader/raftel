@@ -1,3 +1,4 @@
+from argparse import ArgumentParser
 from commons import RPCPacket
 from gevent.socket import SocketType
 
@@ -5,7 +6,6 @@ import commons
 import gevent
 import logging
 import os
-import sys
 import time
 
 LOGGER_NAME = "raftel-node"
@@ -63,6 +63,26 @@ class RaftNode(object):
             logger.info("RECV: %s" % resp[0])
 
 if __name__ == "__main__":
-    st = RaftNode(10, 4000)
-    st.connect("127.0.0.1", int(sys.argv[1]))
+    parser = ArgumentParser(description="node for a raft cluster")
+    parser.add_argument(
+        "--election-timeout", "-e", required=False, type=int, default=10,
+        help="How long to wait for a leader heartbeat. Measured in milliseconds."
+    )
+    parser.add_argument(
+        "--keep-alive", "-k", required=False, type=int, default=30000,
+        help="The time between keep-alives to the RPC overseer. Measured in milliseconds."
+    )
+    parser.add_argument(
+        "--host", "-H", required=True, type=str,
+        help="The host address of the RPC overseer."
+    )
+    parser.add_argument(
+        "--port", "-p", required=True, type=int,
+        help="The port on which the RPC overseer is listening."
+    )
+
+    args = vars(parser.parse_args())
+
+    st = RaftNode(args["election_timeout"], args["keep_alive"])
+    st.connect(args["host"], args["port"])
     st.serve_forever()
