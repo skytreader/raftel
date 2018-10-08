@@ -1,3 +1,4 @@
+from argparse import ArgumentParser
 from gevent import Greenlet
 from gevent.server import StreamServer
 from commons import RPCPacket
@@ -7,7 +8,6 @@ import commons
 import gevent
 import logging
 import os
-import sys
 
 """
 The Overseer protocol is a RS-delimited (byte 1E) protocol which follows the
@@ -131,6 +131,12 @@ class OverSeerver(StreamServer):
         ch.join()
 
 if __name__ == "__main__":
-    overseer = OverSeerver(int(sys.argv[1]))
+    parser = ArgumentParser(description="An RPC overseer for facilitating RAFT.")
+    parser.add_argument(
+        "--port", "-p", required=True, type=int,
+        help="The port to which the overseer will bind and listen for connections."
+    )
+    args = vars(parser.parse_args())
+    overseer = OverSeerver(args["port"])
     logger.info("Starting overseer...")
     overseer.serve_forever()

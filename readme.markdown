@@ -8,7 +8,7 @@ Create a python3 virtualenv, install the requirements and then in separate tabs
 issue:
 
 ```
-(raft)$ python src/overseer.py 16981
+(raft)$ python src/overseer.py -p 16981
 (raft)$ python src/raftnode.py -H 127.0.0.1 -p 16981
 ```
 
