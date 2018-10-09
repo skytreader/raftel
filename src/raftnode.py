@@ -21,7 +21,7 @@ file_handler.setFormatter(formatter)
 stream_handler = logging.StreamHandler()
 stream_handler.setFormatter(formatter)
 
-logger.addHandler(file_handler)
+#logger.addHandler(file_handler)
 logger.addHandler(stream_handler)
 
 class NodeStates(Enum):
@@ -40,10 +40,16 @@ class RaftNode(object):
 
         wait_sleep is the time this node sleeps between sending a keep alive to
         the RPC Overseer.
+
+        You typically want election_timeout to be greater than wait_sleep. The
+        rationale is that you want the node to send a few keep alives to
+        overseer before trying to go for election; this gives the other nodes
+        time to join the cluster.
         """
         self.sock = SocketType()
         # "Mock" leader ping to start with.
         self.last_leader_ping = self.__current_time_millis() # type: int
+        self.last_transaction = self.__current_time_millis() # type: int
         self.election_timeout = election_timeout # type: int
         self.wait_sleep = wait_sleep # type: int
 
@@ -65,18 +71,28 @@ class RaftNode(object):
     def serve_forever(self) -> None:
         packet_number = 1
         while True:
-            gevent.sleep(self.wait_sleep / 1000)
             now = self.__current_time_millis()
-            if (now - self.last_leader_ping) > self.election_timeout:
+            send_packet = None # type: RPCPacket
+            if (now - self.last_leader_ping) > self.election_timeout and self.state == NodeStates.FOLLOWER:
                 # Tell the overseer you want to be the leader
-                pass
-            # Send a keep alive
-            keepalive = RPCPacket(packet_number=packet_number, command=ord("C"))
-            logger.info("SEND: %s" % keepalive)
-            self.sock.sendall(keepalive.make_sendable_stream())
+                send_packet = RPCPacket(packet_number=packet_number, command=ord("D"))
+                self.current_term += 1
+                self.state = NodeStates.CANDIDATE
+            else:
+                # Send a keep alive
+                keep_alive_diff = now - self.last_transaction
+                if keep_alive_diff >= self.wait_sleep:
+                    send_packet = RPCPacket(packet_number=packet_number, command=ord("C"))
+                else:
+                    gevent.sleep((self.wait_sleep - keep_alive_diff) / 1000)
+                    send_packet = RPCPacket(packet_number=packet_number, command=ord("C"))
+            
+            logger.info("SEND: %s" % send_packet)
+            self.sock.sendall(send_packet.make_sendable_stream())
             resp = self.sock.recvfrom(128)
 
             logger.info("RECV: %s" % resp[0])
+            self.last_transaction = self.__current_time_millis()
 
 if __name__ == "__main__":
     parser = ArgumentParser(description="node for a raft cluster")
