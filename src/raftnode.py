@@ -1,5 +1,6 @@
 from argparse import ArgumentParser
 from commons import RPCPacket
+from enum import Enum
 from gevent.socket import SocketType
 
 import commons
@@ -23,6 +24,11 @@ stream_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 logger.addHandler(stream_handler)
 
+class NodeStates(Enum):
+    FOLLOWER = 0
+    CANDIDATE = 1
+    LEADER = 2
+
 class RaftNode(object):
 
     def __init__(self, election_timeout: int, wait_sleep: int =100) -> None:
@@ -37,9 +43,15 @@ class RaftNode(object):
         """
         self.sock = SocketType()
         # "Mock" leader ping to start with.
-        self.last_leader_ping = int(time.time() * 1000)
-        self.election_timeout = election_timeout
-        self.wait_sleep = wait_sleep
+        self.last_leader_ping = self.__current_time_millis() # type: int
+        self.election_timeout = election_timeout # type: int
+        self.wait_sleep = wait_sleep # type: int
+
+        self.current_term = 0 # type: int
+        self.state = NodeStates.FOLLOWER # type: NodeStates
+
+    def __current_time_millis(self) -> int:
+        return int(time.time() * 1000)
 
     def connect(self, ip: str, port: int) -> None:
         self.sock.connect((ip, port))
@@ -54,6 +66,10 @@ class RaftNode(object):
         packet_number = 1
         while True:
             gevent.sleep(self.wait_sleep / 1000)
+            now = self.__current_time_millis()
+            if (now - self.last_leader_ping) > self.election_timeout:
+                # Tell the overseer you want to be the leader
+                pass
             # Send a keep alive
             keepalive = RPCPacket(packet_number=packet_number, command=ord("C"))
             logger.info("SEND: %s" % keepalive)

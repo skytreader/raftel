@@ -41,6 +41,12 @@ Responses will also start with the packet number they are acknowledging.
 
 - During idle times, each node should send a keep alive (C) to the Overseer.
 This is distinct from the leader heartbeat specified in the Raft protocol.
+
+# Raft-specific commands
+
+Note that these are commands received by the overseer, for propagation.
+
+D - Request Vote
 """
 
 LOGGER_NAME = "raftel-overseer"
@@ -71,8 +77,8 @@ class ClientHandler(Greenlet):
             ack = RPCPacket(parsed_packet.packet_number, commons.ACK)
             return ack
 
-    def __read_from_client(self, client_socket, packet_acc=None) -> List[int]:
-        packet_acc = packet_acc if packet_acc else [] # type: List[int]
+    def __read_from_client(self, client_socket, _packet_acc=None) -> List[int]:
+        packet_acc = _packet_acc if _packet_acc else [] # type: List[int]
 
         while commons.ETX not in packet_acc:
             p = client_socket.recvfrom(32)
@@ -104,8 +110,8 @@ class OverSeerver(StreamServer):
             ack = RPCPacket(parsed_packet.packet_number, commons.ACK)
             return ack
 
-    def __read_from_client(self, client_socket, packet_acc=None) -> List[int]:
-        packet_acc = packet_acc if packet_acc else [] # type: List[int]
+    def __read_from_client(self, client_socket: gevent._socket3.socket, _packet_acc=None) -> List[int]:
+        packet_acc = _packet_acc if _packet_acc else [] # type: List[int]
 
         while commons.ETX not in packet_acc:
             p = client_socket.recvfrom(32)
@@ -114,7 +120,7 @@ class OverSeerver(StreamServer):
 
         return packet_acc
 
-    def handle(self, client_socket, address):
+    def handle(self, client_socket: gevent._socket3.socket, address):
         logger.info("connection RECV %s" % client_socket)
         packet_acc = self.__read_from_client(client_socket) # type: List[int]
         
