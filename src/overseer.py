@@ -1,5 +1,5 @@
 from argparse import ArgumentParser
-from gevent import Greenlet
+from gevent import Greenlet, monkey
 from gevent.server import StreamServer
 from commons import RPCPacket
 from typing import List
@@ -49,6 +49,8 @@ Note that these are commands received by the overseer, for propagation.
 D - Request Vote
 """
 
+monkey.patch_all()
+
 LOGGER_NAME = "raftel-overseer"
 logger = logging.getLogger(LOGGER_NAME)
 logger.setLevel(int(os.environ.get("raftel_log_level", logging.INFO)))
@@ -66,29 +68,33 @@ logger.addHandler(stream_handler)
 
 class ClientHandler(Greenlet):
 
-    def __init__(self, client_socket):
+    def __init__(self, client_socket: gevent._socket3.socket) -> None:
         Greenlet.__init__(self)
         self.client_socket = client_socket
 
     def __make_response(self, parsed_packet: RPCPacket) -> RPCPacket:
-        logger.debug("The command is %s vs %s" % (parsed_packet.command, ord('A')))
         if parsed_packet.validate():
             logger.debug("Calling RPCPacket for ACK")
             ack = RPCPacket(parsed_packet.packet_number, commons.ACK)
             return ack
 
-    def __read_from_client(self, client_socket, _packet_acc=None) -> List[int]:
+    def __read_from_client(self, client_socket: gevent._socket3.socket, _packet_acc=None) -> List[int]:
         packet_acc = _packet_acc if _packet_acc else [] # type: List[int]
 
         while commons.ETX not in packet_acc:
             p = client_socket.recvfrom(32)
-            logger.debug(p)
+            logger.debug("Raw RECV from socket: %s" % str(p))
+            if not len(p[0]):
+                logger.critical("Received nothing from socket %s, breaking read loop..." % self.client_socket)
+                break
             packet_acc.extend(p[0])
+            gevent.sleep(0.5)
 
         return packet_acc
 
     def _run(self):
         while True:
+            logger.debug("Reading from socket...")
             recv = RPCPacket.parse(self.__read_from_client(self.client_socket))
             logger.info("RECV %s" % recv)
             resp = self.__make_response(recv)
@@ -122,6 +128,7 @@ class OverSeerver(StreamServer):
 
     def handle(self, client_socket: gevent._socket3.socket, address):
         logger.info("connection RECV %s" % client_socket)
+        client_socket.settimeout(20)
         packet_acc = self.__read_from_client(client_socket) # type: List[int]
         
         parsed_packet = RPCPacket.parse(packet_acc)
@@ -134,7 +141,11 @@ class OverSeerver(StreamServer):
         client_socket.sendall(resp.make_sendable_stream())
         ch = ClientHandler(client_socket)
         ch.start()
-        ch.join()
+        ch.join(timeout=60)
+        gevent.sleep()
+        logger.info("Killing greenlet %s" % client_socket)
+        ch.kill()
+        logger.info("Greenlet %s dead" % client_socket)
 
 if __name__ == "__main__":
     parser = ArgumentParser(description="An RPC overseer for facilitating RAFT.")

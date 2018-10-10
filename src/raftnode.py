@@ -21,7 +21,7 @@ file_handler.setFormatter(formatter)
 stream_handler = logging.StreamHandler()
 stream_handler.setFormatter(formatter)
 
-#logger.addHandler(file_handler)
+logger.addHandler(file_handler)
 logger.addHandler(stream_handler)
 
 class NodeStates(Enum):
@@ -65,8 +65,8 @@ class RaftNode(object):
         logger.info("SEND: %s" % login)
         self.sock.sendall(login.make_sendable_stream())
         spam = self.sock.recvfrom(128)
-        
         logger.info("RECV: %s" % spam[0])
+        self.last_transaction = self.__current_time_millis()
 
     def serve_forever(self) -> None:
         packet_number = 1
@@ -92,6 +92,8 @@ class RaftNode(object):
             resp = self.sock.recvfrom(128)
 
             logger.info("RECV: %s" % resp[0])
+            if not len(resp[0]):
+                break
             self.last_transaction = self.__current_time_millis()
 
 if __name__ == "__main__":
