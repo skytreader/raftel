@@ -23,3 +23,11 @@ code. To check that your modifications are type-consistent:
 
 We ignore missing imports because gevent does not have mypy types as of this
 writing.
+
+## Debugging
+
+To debug either overseer or raftnode, just set the `raftel_log_level`
+environment variable to 10 (the actual value of `logging.DEBUG` in Python). Note
+that you can set the envvar for the current command only via
+
+    raftel_log_level=10 python src/raftnode.py -H 127.0.0.1 -p 16981

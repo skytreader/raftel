@@ -43,8 +43,9 @@ class RPCPacket(object):
         return RPCPacket.parse(packet_stream).validate()
 
     @staticmethod
-    def parse(packet_stream: List[int], logger_name="raftel-common") -> "RPCPacket":
+    def parse(packet_stream: List[int], logger_name="raftel-commons") -> "RPCPacket":
         logger = logging.getLogger(logger_name)
+        logger.setLevel(int(os.environ.get("raftel_log_level", logging.INFO)))
         byte_acc = [] # type: list
 
         packet_order = ("packet_number", "command", "additional_info")
