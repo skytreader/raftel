@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 import logging
 import os
@@ -13,14 +13,14 @@ RS = int("1E", 16) # type: int
 class RPCPacket(object):
 
     # Specifically tailored for **dictionary usage. Please don't leave them be
-    # except possible additional_info.
+    # except possibly additional_info.
     def __init__(
-        self, packet_number: int =-1, command: int =-1, additional_info=None,
+        self, packet_number: int =-1, command: int =-1, additional_info: Optional[List[int]] =None,
         logger_name="raftel-commons"
     ) -> None:
         self.packet_number = packet_number # type: int
         self.command = command # type: int
-        self.additional_info = additional_info if additional_info else []
+        self.additional_info = additional_info if additional_info else [] # type: List[int]
 
         self.logger = logging.getLogger(logger_name)
 
@@ -71,14 +71,13 @@ class RPCPacket(object):
         return parsed_packet
 
     def make_sendable_stream(self) -> bytes:
-        addtl_info_encoded = [ord(c) for c in self.additional_info]
         partial_packet = [
             STX, self.packet_number, RS, self.command
         ] # type: List[int]
 
-        if addtl_info_encoded:
+        if self.additional_info:
             partial_packet.append(RS)
-            partial_packet.extend(addtl_info_encoded)
+            partial_packet.extend(self.additional_info)
         
         partial_packet.append(ETX)
 

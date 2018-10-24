@@ -1,7 +1,8 @@
 from argparse import ArgumentParser
+from commons import RPCPacket
+from enum import Enum
 from gevent import Greenlet, monkey
 from gevent.server import StreamServer
-from commons import RPCPacket
 from typing import List
 
 import commons
@@ -36,6 +37,7 @@ transaction is successful or not. NACKs will give the following reasons:
 Responses will also start with the packet number they are acknowledging.
 
 - When a client connects to the Overseer, it connects with a log-in command (A).
+The acknowledgement will return the candidate id in the additional info section.
 
 - Graceful termination would happen by sending a log-out command (B).
 
@@ -65,6 +67,15 @@ stream_handler.setFormatter(formatter)
 
 logger.addHandler(file_handler)
 logger.addHandler(stream_handler)
+
+class OverseerCommands(Enum):
+    LOGIN = ord("A")
+    LOGOUT = ord("B")
+    KEEP_ALIVE = ord("C")
+    REQUEST_VOTE = ord("D")
+    INVALID_CMD = ord("X")
+    MALFORMED_PKT = ord("Y")
+    GENERAL_FAILURE = ord("Z")
 
 class ClientHandler(Greenlet):
 
@@ -108,12 +119,18 @@ class OverSeerver(StreamServer):
         super(OverSeerver, self).__init__(("127.0.0.1", bind_port))
         self.leader = None
         self.socket_clique = [] # type: list
+        # In Java-speak, this member should be synchronized.
+        self.client_id = 1
 
-    def __make_response(self, parsed_packet: RPCPacket) -> RPCPacket:
-        logger.debug("The command is %s vs %s" % (parsed_packet.command, ord('A')))
-        if parsed_packet.validate():
+    def __make_response(self, parsed_recv: RPCPacket) -> RPCPacket:
+        if parsed_recv.validate():
             logger.debug("Calling RPCPacket for ACK")
-            ack = RPCPacket(parsed_packet.packet_number, commons.ACK)
+            ack = RPCPacket(parsed_recv.packet_number, commons.ACK)
+
+            # Add additional_info that might be relevant
+            if parsed_recv.command == OverseerCommands.LOGIN:
+                ack.additional_info = [self.client_id]
+                self.client_id += 1
             return ack
 
     def __read_from_client(self, client_socket: gevent._socket3.socket, _packet_acc=None) -> List[int]:
@@ -128,20 +145,19 @@ class OverSeerver(StreamServer):
 
     def handle(self, client_socket: gevent._socket3.socket, address):
         logger.info("connection RECV %s" % client_socket)
-        client_socket.settimeout(20)
         packet_acc = self.__read_from_client(client_socket) # type: List[int]
         
         parsed_packet = RPCPacket.parse(packet_acc)
         logger.info("RECV %s" % parsed_packet)
         resp = self.__make_response(parsed_packet)
-        if parsed_packet.command == ord("A") and resp.command == commons.ACK:
+        if parsed_packet.command == OverseerCommands.LOGIN and resp.command == commons.ACK:
             self.socket_clique.append(client_socket)
         logger.info("SEND %s" % resp)
         logger.info("Spawning greenlet for %s" % client_socket)
         client_socket.sendall(resp.make_sendable_stream())
         ch = ClientHandler(client_socket)
         ch.start()
-        ch.join(timeout=60)
+        ch.join()
         gevent.sleep()
         logger.info("Killing greenlet %s" % client_socket)
         ch.kill()
