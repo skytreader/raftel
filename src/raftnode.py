@@ -61,7 +61,7 @@ class RaftNode(object):
 
     def connect(self, ip: str, port: int) -> None:
         self.sock.connect((ip, port))
-        login = RPCPacket(0, OverseerCommands.LOGIN)
+        login = RPCPacket(0, OverseerCommands.LOGIN.value)
         logger.info("SEND: %s" % login)
         self.sock.sendall(login.make_sendable_stream())
         overseer_resp = self.sock.recvfrom(128)
