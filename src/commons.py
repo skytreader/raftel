@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import List, Optional
 
 import logging
@@ -9,6 +10,15 @@ ETX = 3 # type: int
 ACK = int("6", 16) # type: int
 NACK = int("15", 16) # type: int
 RS = int("1E", 16) # type: int
+
+class OverseerCommands(Enum):
+    LOGIN = ord("A")
+    LOGOUT = ord("B")
+    KEEP_ALIVE = ord("C")
+    REQUEST_VOTE = ord("D")
+    INVALID_CMD = ord("X")
+    MALFORMED_PKT = ord("Y")
+    GENERAL_FAILURE = ord("Z")
 
 class RPCPacket(object):
 

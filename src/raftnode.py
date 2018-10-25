@@ -1,5 +1,5 @@
 from argparse import ArgumentParser
-from commons import RPCPacket
+from commons import RPCPacket, OverseerCommands
 from enum import Enum
 from gevent.socket import SocketType
 
@@ -61,11 +61,13 @@ class RaftNode(object):
 
     def connect(self, ip: str, port: int) -> None:
         self.sock.connect((ip, port))
-        login = RPCPacket(0, ord("A"))
+        login = RPCPacket(0, OverseerCommands.LOGIN)
         logger.info("SEND: %s" % login)
         self.sock.sendall(login.make_sendable_stream())
-        spam = self.sock.recvfrom(128)
-        logger.info("RECV: %s" % spam[0])
+        overseer_resp = self.sock.recvfrom(128)
+        logger.info("RECV: %s" % overseer_resp[0])
+        parse_resp = RPCPacket.parse(overseer_resp[0])
+        logger.info("Got client id %s" % parse_resp.additional_info)
         self.last_transaction = self.__current_time_millis()
 
     def serve_forever(self) -> None:

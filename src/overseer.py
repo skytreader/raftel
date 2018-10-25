@@ -1,6 +1,5 @@
 from argparse import ArgumentParser
-from commons import RPCPacket
-from enum import Enum
+from commons import RPCPacket, OverseerCommands
 from gevent import Greenlet, monkey
 from gevent.server import StreamServer
 from typing import List
@@ -68,15 +67,6 @@ stream_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 logger.addHandler(stream_handler)
 
-class OverseerCommands(Enum):
-    LOGIN = ord("A")
-    LOGOUT = ord("B")
-    KEEP_ALIVE = ord("C")
-    REQUEST_VOTE = ord("D")
-    INVALID_CMD = ord("X")
-    MALFORMED_PKT = ord("Y")
-    GENERAL_FAILURE = ord("Z")
-
 class ClientHandler(Greenlet):
 
     def __init__(self, client_socket: gevent._socket3.socket) -> None:
@@ -137,8 +127,12 @@ class OverSeerver(StreamServer):
         packet_acc = _packet_acc if _packet_acc else [] # type: List[int]
 
         while commons.ETX not in packet_acc:
+            # TODO Refactor this with ClientHandler above.
             p = client_socket.recvfrom(32)
             logger.debug(p)
+            if not len(p[0]):
+                logger.critical("Client pinged but did not complete initial handshake.")
+                break
             packet_acc.extend(p[0])
 
         return packet_acc
