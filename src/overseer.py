@@ -24,7 +24,8 @@ where arguments are also RS delimited.
 
 - Responses will have either ACK or NACK for their commmand field.
 
-- Responses will take the form <ACK OR NACK><RS><ADDITIONAL INFO>.
+- Responses will take the form <ACK OR NACK><RS><ADDITIONAL INFO>. The data in
+the additional info field is also separated with RS, where it applies.
 
 - Every command will be ACKed (6) or NACKed (15), depending on whether the
 transaction is successful or not. NACKs will give the following reasons:
@@ -104,6 +105,15 @@ class ClientHandler(Greenlet):
             gevent.sleep(1)
 
 class OverSeerver(StreamServer):
+    """
+    The Overseer facilitates a whole distributed cluster. Nodes of a cluster
+    only need to sign up to the Overseer and it will facilitate communication
+    with the rest of the cluster.
+
+    Note that even if it was written with Raft in mind, this can also be used
+    for other cluster set-ups. All you need to do is change the Greenlet spun
+    up for each new client.
+    """
 
     def __init__(self, bind_port: int, **kwargs) -> None:
         super(OverSeerver, self).__init__(("127.0.0.1", bind_port))

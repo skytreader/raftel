@@ -52,6 +52,7 @@ class RaftNode(object):
         self.last_transaction = self.__current_time_millis() # type: int
         self.election_timeout = election_timeout # type: int
         self.wait_sleep = wait_sleep # type: int
+        self.raft_id = -1 # type: int
 
         self.current_term = 0 # type: int
         self.state = NodeStates.FOLLOWER # type: NodeStates
@@ -68,6 +69,7 @@ class RaftNode(object):
         logger.info("RECV: %s" % overseer_resp[0])
         parse_resp = RPCPacket.parse(overseer_resp[0])
         logger.info("Got client id %s" % parse_resp.additional_info)
+        self.raft_id = parse_resp.additional_info[0]
         self.last_transaction = self.__current_time_millis()
 
     def serve_forever(self) -> None:
@@ -76,8 +78,9 @@ class RaftNode(object):
             now = self.__current_time_millis()
             send_packet = None # type: RPCPacket
             if (now - self.last_leader_ping) > self.election_timeout and self.state == NodeStates.FOLLOWER:
+                logging.info("Too long without a leader, initiating transaction. (%s last leader comms, willing to wait for %s)." % (self.last_leader_ping, self.election_timeout)) 
                 # Tell the overseer you want to be the leader
-                send_packet = RPCPacket(packet_number=packet_number, command=ord("D"))
+                send_packet = RPCPacket(packet_number=packet_number, command=OverseerCommands.REQUEST_VOTE.value)
                 self.current_term += 1
                 self.state = NodeStates.CANDIDATE
             else:

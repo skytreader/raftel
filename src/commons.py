@@ -52,6 +52,26 @@ class RPCPacket(object):
     def validate_stream(packet_stream: List[int]) -> bool:
         return RPCPacket.parse(packet_stream).validate()
 
+    # TODO Refactor as this is almost the same as parse method below.
+    @staticmethod
+    def __parse_additional_info(gathered_stream: List[int]) -> List[int]:
+        i = 0
+        limit = len(gathered_stream)
+        additional_info = [] # type: List[int]
+        byte_acc = [] # type: List[int]
+
+        while i < limit:
+            if gathered_stream[i] == RS:
+                additional_info.append(int.from_bytes(bytes(byte_acc), sys.byteorder))
+            else:
+                byte_acc.append(gathered_stream[i])
+
+            i += 1
+
+        if byte_acc:
+            additional_info.append(int.from_bytes(bytes(byte_acc), sys.byteorder))
+        return additional_info
+
     @staticmethod
     def parse(packet_stream: List[int], logger_name="raftel-commons") -> "RPCPacket":
         logger = logging.getLogger(logger_name)
@@ -76,7 +96,11 @@ class RPCPacket(object):
                 byte_acc.append(packet_stream[i])
             i += 1
 
-        packet_kwargs[packet_order[field_index]] = int.from_bytes(bytes(byte_acc), sys.byteorder)
+        logger.debug("field index is %s" % field_index)
+        if field_index == 2:
+            packet_kwargs["additional_info"] = RPCPacket.__parse_additional_info(byte_acc)
+        else:
+            packet_kwargs[packet_order[field_index]] = int.from_bytes(bytes(byte_acc), sys.byteorder)
         logger.debug("Calling RPCPacket for parsed stream")
         parsed_packet = RPCPacket(**packet_kwargs)
         return parsed_packet
