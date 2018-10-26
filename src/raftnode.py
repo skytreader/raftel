@@ -77,8 +77,9 @@ class RaftNode(object):
         while True:
             now = self.__current_time_millis()
             send_packet = None # type: RPCPacket
-            if (now - self.last_leader_ping) > self.election_timeout and self.state == NodeStates.FOLLOWER:
-                logging.info("Too long without a leader, initiating transaction. (%s last leader comms, willing to wait for %s)." % (self.last_leader_ping, self.election_timeout)) 
+            leader_ping_delta = now - self.last_leader_ping
+            if leader_ping_delta > self.election_timeout and self.state == NodeStates.FOLLOWER:
+                logger.info("Too long without a leader, initiating transaction. (%s since last leader comms, willing to wait for %s)." % (leader_ping_delta, self.election_timeout)) 
                 # Tell the overseer you want to be the leader
                 send_packet = RPCPacket(packet_number=packet_number, command=OverseerCommands.REQUEST_VOTE.value)
                 self.current_term += 1
@@ -104,7 +105,7 @@ class RaftNode(object):
 if __name__ == "__main__":
     parser = ArgumentParser(description="node for a raft cluster")
     parser.add_argument(
-        "--election-timeout", "-e", required=False, type=int, default=10,
+        "--election-timeout", "-e", required=False, type=int, default=10000,
         help="How long to wait for a leader heartbeat. Measured in milliseconds."
     )
     parser.add_argument(
