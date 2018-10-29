@@ -50,6 +50,8 @@ class RaftNode(object):
         # "Mock" leader ping to start with.
         self.last_leader_ping = self.__current_time_millis() # type: int
         self.last_transaction = self.__current_time_millis() # type: int
+        self.last_log_index = 0 # type: int
+        self.last_log_term = 0 # type: int
         self.election_timeout = election_timeout # type: int
         self.wait_sleep = wait_sleep # type: int
         self.raft_id = -1 # type: int
@@ -62,7 +64,7 @@ class RaftNode(object):
 
     def connect(self, ip: str, port: int) -> None:
         self.sock.connect((ip, port))
-        login = RPCPacket(0, OverseerCommands.LOGIN.value)
+        login = RPCPacket(0, OverseerCommands.LOGIN)
         logger.info("SEND: %s" % login)
         self.sock.sendall(login.make_sendable_stream())
         overseer_resp = self.sock.recvfrom(128)
@@ -80,8 +82,10 @@ class RaftNode(object):
             leader_ping_delta = now - self.last_leader_ping
             if leader_ping_delta > self.election_timeout and self.state == NodeStates.FOLLOWER:
                 logger.info("Too long without a leader, initiating transaction. (%s since last leader comms, willing to wait for %s)." % (leader_ping_delta, self.election_timeout)) 
+                if self.raft_id <= 0:
+                    raise ValueError("Haven't received a valid ID from Overseer yet.")
                 # Tell the overseer you want to be the leader
-                send_packet = RPCPacket(packet_number=packet_number, command=OverseerCommands.REQUEST_VOTE.value)
+                send_packet = RPCPacket(packet_number=packet_number, command=OverseerCommands.REQUEST_VOTE)
                 self.current_term += 1
                 self.state = NodeStates.CANDIDATE
             else:
@@ -91,7 +95,7 @@ class RaftNode(object):
                     send_packet = RPCPacket(packet_number=packet_number, command=ord("C"))
                 else:
                     gevent.sleep((self.wait_sleep - keep_alive_diff) / 1000)
-                    send_packet = RPCPacket(packet_number=packet_number, command=ord("C"))
+                    send_packet = RPCPacket(packet_number=packet_number, command=OverseerCommands.KEEP_ALIVE)
             
             logger.info("SEND: %s" % send_packet)
             self.sock.sendall(send_packet.make_sendable_stream())

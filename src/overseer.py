@@ -77,7 +77,7 @@ class ClientHandler(Greenlet):
     def __make_response(self, parsed_packet: RPCPacket) -> RPCPacket:
         if parsed_packet.validate():
             logger.debug("Calling RPCPacket for ACK")
-            ack = RPCPacket(parsed_packet.packet_number, commons.ACK)
+            ack = RPCPacket(parsed_packet.packet_number, OverseerCommands.ACK)
             return ack
 
     def __read_from_client(self, client_socket: gevent._socket3.socket, _packet_acc=None) -> List[int]:
@@ -125,10 +125,10 @@ class OverSeerver(StreamServer):
     def __make_response(self, parsed_recv: RPCPacket) -> RPCPacket:
         if parsed_recv.validate():
             logger.debug("Calling RPCPacket for ACK")
-            ack = RPCPacket(parsed_recv.packet_number, commons.ACK)
+            ack = RPCPacket(parsed_recv.packet_number, OverseerCommands.ACK)
 
             # Add additional_info that might be relevant
-            if parsed_recv.command == OverseerCommands.LOGIN.value:
+            if parsed_recv.command == OverseerCommands.LOGIN:
                 ack.additional_info = [self.client_id]
                 self.client_id += 1
             return ack
@@ -154,7 +154,7 @@ class OverSeerver(StreamServer):
         parsed_packet = RPCPacket.parse(packet_acc)
         logger.info("RECV %s" % parsed_packet)
         resp = self.__make_response(parsed_packet)
-        if parsed_packet.command == OverseerCommands.LOGIN.value and resp.command == commons.ACK:
+        if parsed_packet.command == OverseerCommands.LOGIN and resp.command == OverseerCommands.ACK:
             self.socket_clique.append(client_socket)
         logger.info("SEND %s" % resp)
         logger.info("Spawning greenlet for %s" % client_socket)

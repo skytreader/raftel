@@ -7,7 +7,6 @@ import sys
 
 STX = 2 # type: int
 ETX = 3 # type: int
-ACK = int("6", 16) # type: int
 NACK = int("15", 16) # type: int
 RS = int("1E", 16) # type: int
 
@@ -19,17 +18,23 @@ class OverseerCommands(Enum):
     INVALID_CMD = ord("X")
     MALFORMED_PKT = ord("Y")
     GENERAL_FAILURE = ord("Z")
+    ACK = int("6", 16)
 
 class RPCPacket(object):
 
     # Specifically tailored for **dictionary usage. Please don't leave them be
     # except possibly additional_info.
     def __init__(
-        self, packet_number: int =-1, command: int =-1, additional_info: Optional[List[int]] =None,
-        logger_name="raftel-commons"
+        self,
+        packet_number: int = -1,
+        command: Optional[OverseerCommands] = None,
+        additional_info: Optional[List[int]] = None,
+        logger_name: str = "raftel-commons"
     ) -> None:
+        if packet_number < 0 or command is None:
+            raise ValueError("Please set the initial fields of RPCPacket properly.")
         self.packet_number = packet_number # type: int
-        self.command = command # type: int
+        self.command = command # type: OverseerCommands
         self.additional_info = additional_info if additional_info else [] # type: List[int]
 
         self.logger = logging.getLogger(logger_name)
@@ -42,7 +47,7 @@ class RPCPacket(object):
             self.logger.addHandler(stream_handler)
 
         self.logger.debug("RPCPacket debug: %s %s" % (self.packet_number, type(self.packet_number)))
-        self.logger.debug("RPCPacket debug: %s %s" % (self.command, type(self.command)))
+        self.logger.debug("RPCPacket debug: %s %s" % (self.command.value, type(self.command.value)))
         self.logger.debug("RPCPacket debug: %s %s" % (self.additional_info, type(self.additional_info)))
 
     def validate(self) -> bool:
@@ -101,13 +106,15 @@ class RPCPacket(object):
             packet_kwargs["additional_info"] = RPCPacket.__parse_additional_info(byte_acc)
         else:
             packet_kwargs[packet_order[field_index]] = int.from_bytes(bytes(byte_acc), sys.byteorder)
+
+        packet_kwargs["command"] = OverseerCommands(packet_kwargs["command"])
         logger.debug("Calling RPCPacket for parsed stream")
         parsed_packet = RPCPacket(**packet_kwargs)
         return parsed_packet
 
     def make_sendable_stream(self) -> bytes:
         partial_packet = [
-            STX, self.packet_number, RS, self.command
+            STX, self.packet_number, RS, self.command.value
         ] # type: List[int]
 
         if self.additional_info:
