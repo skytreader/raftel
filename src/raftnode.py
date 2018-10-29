@@ -74,6 +74,20 @@ class RaftNode(object):
         self.raft_id = parse_resp.additional_info[0]
         self.last_transaction = self.__current_time_millis()
 
+    def __recv(self, buffer: int):
+        packet_acc = [] # type: List[int]
+
+        while commons.ETX not in packet_acc:
+             p = self.sock.recvfrom(buffer)
+             if not len(p[0]):
+                logger.critical("Node seems to be disconnected...")
+                break
+
+             packet_acc.extend(p[0])
+             gevent.sleep(0.5)
+
+       return packet_acc
+
     def serve_forever(self) -> None:
         packet_number = 1
         while True:
@@ -99,11 +113,9 @@ class RaftNode(object):
             
             logger.info("SEND: %s" % send_packet)
             self.sock.sendall(send_packet.make_sendable_stream())
-            resp = self.sock.recvfrom(128)
+            resp = self.__recv(128)
 
-            logger.info("RECV: %s" % resp[0])
-            if not len(resp[0]):
-                break
+            logger.info("RECV: %s" % resp)
             self.last_transaction = self.__current_time_millis()
 
 if __name__ == "__main__":
