@@ -7,7 +7,6 @@ import sys
 
 STX = 2 # type: int
 ETX = 3 # type: int
-NACK = int("15", 16) # type: int
 RS = int("1E", 16) # type: int
 
 class OverseerCommands(Enum):
@@ -19,6 +18,7 @@ class OverseerCommands(Enum):
     MALFORMED_PKT = ord("Y")
     GENERAL_FAILURE = ord("Z")
     ACK = int("6", 16)
+    NACK = int("15", 16)
 
 class RPCPacket(object):
 

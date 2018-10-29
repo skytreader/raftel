@@ -70,15 +70,42 @@ logger.addHandler(stream_handler)
 
 class ClientHandler(Greenlet):
 
-    def __init__(self, client_socket: gevent._socket3.socket) -> None:
+    def __init__(
+        self,
+        client_socket: gevent._socket3.socket,
+        clientid: int,
+        max_bad_transactions: int = 5
+    ) -> None:
         Greenlet.__init__(self)
         self.client_socket = client_socket
+        self.clientid = clientid # type: int
+        self.expected_packet_number = 1 # type: int
+        self.max_bad_transactions = max_bad_transactions # type: int
+
+        self.bad_transaction_count = 0 # type: int
+
+    def __state_validate(self, parsed_packet: RPCPacket) -> bool:
+        """
+        This validation takes into account the actual state of our connection so
+        far with the client. Ensures client cannot issue commands that may be
+        legal RPC packets but are illegal under present circumstances.
+        """
+        return parsed_packet.packet_number == self.expected_packet_number
 
     def __make_response(self, parsed_packet: RPCPacket) -> RPCPacket:
-        if parsed_packet.validate():
+        if parsed_packet.validate() and self.__state_validate(parsed_packet):
             logger.debug("Calling RPCPacket for ACK")
             ack = RPCPacket(parsed_packet.packet_number, OverseerCommands.ACK)
+            self.bad_transaction_count = 0
             return ack
+        else:
+            logger.warn("Bad transaction from %s." % self.clientid)
+            nack = RPCPacket(
+                parsed_packet.packet_number, OverseerCommands.NACK,
+                (OverseerCommands.GENERAL_FAILURE.value,)
+            )
+            self.bad_transaction_count += 1
+            return nack
 
     def __read_from_client(self, client_socket: gevent._socket3.socket, _packet_acc=None) -> List[int]:
         packet_acc = _packet_acc if _packet_acc else [] # type: List[int]
@@ -102,6 +129,13 @@ class ClientHandler(Greenlet):
             resp = self.__make_response(recv)
             logger.info("SEND %s" % resp)
             self.client_socket.sendall(resp.make_sendable_stream())
+            self.expected_packet_number = (self.expected_packet_number + 1) % 256
+            if self.bad_transaction_count >= self.max_bad_transactions:
+                logger.critical(
+                    "Client %s hit %s consecutive bad transactions (limit: %s)" % 
+                    (self.clientid, self.bad_transaction_count, self.max_bad_transactions)
+                )
+                self.kill()
             gevent.sleep(1)
 
 class OverSeerver(StreamServer):
@@ -115,12 +149,13 @@ class OverSeerver(StreamServer):
     up for each new client.
     """
 
-    def __init__(self, bind_port: int, **kwargs) -> None:
+    def __init__(self, bind_port: int, max_bad_transactions: int = 5, **kwargs) -> None:
         super(OverSeerver, self).__init__(("127.0.0.1", bind_port))
         self.leader = None
         self.socket_clique = [] # type: list
         # In Java-speak, this member should be synchronized.
         self.client_id = 1
+        self.max_bad_transactions = max_bad_transactions
 
     def __make_response(self, parsed_recv: RPCPacket) -> RPCPacket:
         if parsed_recv.validate():
@@ -153,13 +188,13 @@ class OverSeerver(StreamServer):
         
         parsed_packet = RPCPacket.parse(packet_acc)
         logger.info("RECV %s" % parsed_packet)
+        ch = ClientHandler(client_socket, self.client_id)
         resp = self.__make_response(parsed_packet)
         if parsed_packet.command == OverseerCommands.LOGIN and resp.command == OverseerCommands.ACK:
             self.socket_clique.append(client_socket)
         logger.info("SEND %s" % resp)
         logger.info("Spawning greenlet for %s" % client_socket)
         client_socket.sendall(resp.make_sendable_stream())
-        ch = ClientHandler(client_socket)
         ch.start()
         ch.join()
         gevent.sleep()
@@ -173,7 +208,11 @@ if __name__ == "__main__":
         "--port", "-p", required=True, type=int,
         help="The port to which the overseer will bind and listen for connections."
     )
+    parser.add_argument(
+        "--max-bad-transactions", "-x", required=False, default=5,
+        help="Max consecutive transactions that are NACKed before forcefully disconnecting client."
+    )
     args = vars(parser.parse_args())
-    overseer = OverSeerver(args["port"])
+    overseer = OverSeerver(args["port"], args["max_bad_transactions"])
     logger.info("Starting overseer...")
     overseer.serve_forever()
