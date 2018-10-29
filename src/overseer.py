@@ -131,10 +131,25 @@ class ClientHandler(Greenlet):
 
         return packet_acc
 
+    def __partition_read_dump(self, read_dump):
+        """
+        Divide read_dump on the first ETX character present. The first ETX
+        character will be returned as part of the first partition.
+        """
+        # Just use ETX as a sentinel character for now. Actual checking that the
+        # packet is sandwiched between STX and ETX should happen when the stream
+        # is actually parsed.
+        etx_index = read_dump.index(commons.ETX)
+        return (read_dump[0:etx_index + 1], read_dump[etx_index + 1:])
+
     def _run(self):
+        read_so_far = []
         while True:
             logger.debug("Reading from socket...")
-            recv = RPCPacket.parse(self.__read_from_client(self.client_socket))
+            read_packet, read_so_far = self.__partition_read_dump(
+                self.__read_from_client(self.client_socket, read_so_far)
+            )
+            recv = RPCPacket.parse(read_packet)
             logger.info("RECV %s" % recv)
             resp = self.__make_response(recv)
             logger.info("SEND %s" % resp)
