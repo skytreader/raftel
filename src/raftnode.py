@@ -2,6 +2,7 @@ from argparse import ArgumentParser
 from commons import RPCPacket, OverseerCommands
 from enum import Enum
 from gevent.socket import SocketType
+from typing import List, Optional
 
 import commons
 import gevent
@@ -74,8 +75,8 @@ class RaftNode(object):
         self.raft_id = parse_resp.additional_info[0]
         self.last_transaction = self.__current_time_millis()
 
-    def __recv(self, buffer: int):
-        packet_acc = [] # type: List[int]
+    def __recv(self, buffer: int, _packet_acc: Optional[List[int]] = None):
+        packet_acc = _packet_acc if _packet_acc else [] # type: List[int]
 
         while commons.ETX not in packet_acc:
              p = self.sock.recvfrom(buffer)
@@ -86,7 +87,9 @@ class RaftNode(object):
              packet_acc.extend(p[0])
              gevent.sleep(0.5)
 
-       return packet_acc
+        return packet_acc
+
+    def __partition_read_dump(self, read_dump): 
 
     def serve_forever(self) -> None:
         packet_number = 1
@@ -114,8 +117,12 @@ class RaftNode(object):
             logger.info("SEND: %s" % send_packet)
             self.sock.sendall(send_packet.make_sendable_stream())
             resp = self.__recv(128)
-
             logger.info("RECV: %s" % resp)
+
+            if commons.ETX not in resp:
+                logger.critical("Received malformed packet from server, disconnecting...")
+                break
+
             self.last_transaction = self.__current_time_millis()
 
 if __name__ == "__main__":
