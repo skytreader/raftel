@@ -93,19 +93,29 @@ class ClientHandler(Greenlet):
         return parsed_packet.packet_number == self.expected_packet_number
 
     def __make_response(self, parsed_packet: RPCPacket) -> RPCPacket:
-        if parsed_packet.validate() and self.__state_validate(parsed_packet):
-            logger.debug("Calling RPCPacket for ACK")
-            ack = RPCPacket(parsed_packet.packet_number, OverseerCommands.ACK)
-            self.bad_transaction_count = 0
-            return ack
-        else:
-            logger.warn("Bad transaction from %s." % self.clientid)
-            nack = RPCPacket(
+        # TODO Handle unknown command
+        response = None
+
+        if not parsed_packet.validate():
+            response = RPCPacket(
+                parsed_packet.packet_number, OverseerCommands.NACK,
+                (OverseerCommands.MALFORMED_PKT,)
+            )
+        elif not self.__state_validate(parsed_packet):
+            response = RPCPacket(
                 parsed_packet.packet_number, OverseerCommands.NACK,
                 (OverseerCommands.GENERAL_FAILURE.value,)
             )
+            ack = RPCPacket(parsed_packet.packet_number, OverseerCommands.ACK)
+        else:
+            response = RPCPacket(parsed_packet.packet_number, OverseerCommands.ACK)
+            self.bad_transaction_count = 0
+
+        if response.command == OverseerCommands.NACK:
+            logger.warn("Bad transaction from %s." % self.clientid)
             self.bad_transaction_count += 1
-            return nack
+
+        return response
 
     def __read_from_client(self, client_socket: gevent._socket3.socket, _packet_acc=None) -> List[int]:
         packet_acc = _packet_acc if _packet_acc else [] # type: List[int]
